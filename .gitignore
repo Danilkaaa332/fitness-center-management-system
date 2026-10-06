@@ -1,0 +1,9 @@
+Debug/
+obj/
+.vs/
+*.user
+*.suo
+*.log
+*.tmp
+Thumbs.db
+desktop.ini
