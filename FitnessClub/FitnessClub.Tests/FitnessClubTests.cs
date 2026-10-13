@@ -58,4 +58,36 @@ public class FitnessClubTests
         Assert.Null(visit);
         Assert.Empty(visitService.GetVisits());
     }
+
+    [Fact]
+    public async Task Regression_CheckValidity_OnLastDayEvening_ShouldBeValid()
+    {
+        var service = new MembershipService(NullLogger<MembershipService>.Instance);
+        var startDate = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        var membership = service.CreateMembership(Guid.NewGuid(), "Месячный безлимит", startDate, 30, 3500m);
+
+        var eveningVisitOnLastDay = new DateTime(2026, 10, 31, 18, 30, 0, DateTimeKind.Utc);
+        var result = await service.CheckValidityAsync(new MembershipCheckRequest(membership.Id, eveningVisitOnLastDay));
+
+        Assert.True(result.IsValid);
+        Assert.Null(result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Regression_RegisterVisit_WhenCalledTwiceSameDay_RejectsDuplicate()
+    {
+        var membershipService = new MembershipService(NullLogger<MembershipService>.Instance);
+        var visitService = new VisitService(membershipService, NullLogger<VisitService>.Instance);
+
+        var customerId = Guid.NewGuid();
+        var membership = membershipService.CreateMembership(customerId, "Месячный безлимит", new DateTime(2026, 10, 1), 30, 3500m);
+
+        var firstVisit = await visitService.RegisterVisitAsync(new RegisterVisitRequest(customerId, membership.Id, new DateTime(2026, 10, 15, 10, 0, 0)));
+        var duplicateVisit = await visitService.RegisterVisitAsync(new RegisterVisitRequest(customerId, membership.Id, new DateTime(2026, 10, 15, 10, 1, 0)));
+
+        Assert.True(firstVisit.Success);
+        Assert.False(duplicateVisit.Success);
+        Assert.Equal("DUPLICATE_VISIT_SAME_DAY", duplicateVisit.ErrorCode);
+        Assert.Single(visitService.GetVisits());
+    }
 }

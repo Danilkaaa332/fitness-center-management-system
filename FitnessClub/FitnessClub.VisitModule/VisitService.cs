@@ -1,4 +1,5 @@
-﻿using FitnessClub.Contracts;
+﻿using System.Diagnostics;
+using FitnessClub.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace FitnessClub.VisitModule;
@@ -20,6 +21,21 @@ public class VisitService
         _logger.LogInformation(
             "Запрос на регистрацию визита: CustomerId={CustomerId}, MembershipId={MembershipId}, VisitDate={VisitDate:O}",
             request.CustomerId, request.MembershipId, request.VisitDate);
+
+        bool alreadyVisitedToday = _visits.Any(v =>
+            v.CustomerId == request.CustomerId &&
+            v.MembershipId == request.MembershipId &&
+            v.VisitDate.Date == request.VisitDate.Date &&
+            v.Status == "Registered");
+
+        if (alreadyVisitedToday)
+        {
+            Debug.WriteLine($"[Debug VisitService] Duplicate visit detected for CustomerId={request.CustomerId} on {request.VisitDate:yyyy-MM-dd}");
+            _logger.LogWarning(
+                "Повторная регистрация визита отклонена: клиент {CustomerId} уже зарегистрирован {VisitDate:yyyy-MM-dd}",
+                request.CustomerId, request.VisitDate);
+            return (false, "DUPLICATE_VISIT_SAME_DAY", null);
+        }
 
         var validation = await _membershipValidator.CheckValidityAsync(
             new MembershipCheckRequest(request.MembershipId, request.VisitDate));
