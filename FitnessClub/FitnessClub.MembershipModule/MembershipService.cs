@@ -1,4 +1,5 @@
-﻿using FitnessClub.Contracts;
+﻿using System.Diagnostics;
+using FitnessClub.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace FitnessClub.MembershipModule;
@@ -15,12 +16,15 @@ public class MembershipService : IMembershipValidationService
 
     public MembershipDto CreateMembership(Guid customerId, string type, DateTime startDate, int durationDays, decimal price, string status = "Active")
     {
+        var normalizedStart = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
+        var normalizedEnd = normalizedStart.AddDays(durationDays);
+
         var membership = new MembershipDto(
             Guid.NewGuid(),
             customerId,
             type,
-            startDate,
-            startDate.AddDays(durationDays),
+            normalizedStart,
+            normalizedEnd,
             price,
             status
         );
@@ -52,11 +56,20 @@ public class MembershipService : IMembershipValidationService
             return Task.FromResult(new ValidationResult(false, "MEMBERSHIP_BLOCKED"));
         }
 
-        if (request.VisitDate.Date < membership.StartDate.Date || request.VisitDate.Date > membership.EndDate.Date)
+        var visitDayUtc = request.VisitDate.Kind == DateTimeKind.Unspecified
+            ? request.VisitDate.Date
+            : request.VisitDate.ToUniversalTime().Date;
+
+        var startDayUtc = membership.StartDate.Date;
+        var endDayUtc = membership.EndDate.Date;
+
+        Debug.WriteLine($"[Debug MembershipService] VisitDay={visitDayUtc:yyyy-MM-dd}, StartDay={startDayUtc:yyyy-MM-dd}, EndDay={endDayUtc:yyyy-MM-dd}");
+
+        if (visitDayUtc < startDayUtc || visitDayUtc > endDayUtc)
         {
             _logger.LogWarning(
                 "Срок действия абонемента {MembershipId} истек (EndDate: {EndDate:yyyy-MM-dd}, VisitDate: {VisitDate:yyyy-MM-dd})",
-                request.MembershipId, membership.EndDate, request.VisitDate);
+                request.MembershipId, endDayUtc, visitDayUtc);
             return Task.FromResult(new ValidationResult(false, "MEMBERSHIP_EXPIRED"));
         }
 
