@@ -328,25 +328,7 @@ dotnet test
 
 ## 3.7. Схема потока данных
 
-```text
-RegisterVisitRequest (CustomerId, MembershipId, VisitDate)
-   │
-   ▼
-[VisitModule: VisitService.RegisterVisitAsync]
-   │
-   │  MembershipCheckRequest (MembershipId, VisitDate)
-   ▼
-[Contracts: IMembershipValidationService.CheckValidityAsync]
-   │
-   ▼
-[MembershipModule: MembershipService.CheckValidityAsync]
-   │
-   │  ValidationResult (IsValid, ErrorCode)
-   ▼
-[VisitModule: VisitService]
-   ├── IsValid == true  ──► Создание VisitDto ("Registered") и сохранение в _visits
-   └── IsValid == false ──► Отказ в регистрации и возврат ErrorCode
-```
+![uml_6](images/uml_6.png)
 
 ---
 

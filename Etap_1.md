@@ -213,38 +213,7 @@ Cancelled
 
 Для проекта выбрана клиент-серверная архитектура с модульным бэкендом.
 
-```text
-                         ┌──────────────────┐
-                         │    WPF-Клиент    │
-                         └────────┬─────────┘
-                                  │
-                                  │ HTTP
-                                  ▼
-                         ┌──────────────────┐
-                         │   FastAPI Host   │
-                         │    (REST API)    │
-                         └────────┬─────────┘
-                                  │
-                 ┌────────────────┼─────────────────┐
-                 │                │                 │
-                 ▼                ▼                 ▼
-        ┌────────────────┐ ┌───────────────┐ ┌────────────────┐
-        │  VisitModule   │ │CustomerModule │ │  ReportModule  │
-        └───────┬────────┘ └───────▲───────┘ └────────────────┘
-                │                  │
-                │ проверка         │ проверка
-                │ абонемента       │ клиента
-                ▼                  │
-        ┌────────────────┐         │
-        │MembershipModule├─────────┘
-        └───────┬────────┘
-                │
-                │
-                ▼
-        ┌────────────────┐
-        │  База данных   │
-        └────────────────┘
-```
+![uml_1](images/uml_1.png)
 
 Центральным модулем бизнес-процесса рецепции является `VisitModule`.
 
@@ -307,33 +276,9 @@ FitnessClub/
 
 Внутренние зависимости на сервере определяют взаимодействие модулей.
 
-```text
-API Host
- ↓
-VisitModule
- ↓
-Contracts (Interfaces)
-
-API Host
- ↓
-MembershipModule
- ↓
-Contracts (Interfaces)
-```
+![uml_2](images/uml_2.png)
 
 Взаимодействие между модулями выполняется через публичные сервисные контракты.
-
-Например:
-
-```text
-VisitModule
-      ↓
-IMembershipValidationService
-      ↓
-MembershipModule
-```
-
-Это позволяет уменьшить связанность системы.
 
 ---
 
@@ -562,23 +507,7 @@ MembershipValidationContract v1
 
 ### 11.12. Пример обмена
 
-```text
-VisitModule
-      │
-      │ check_validity(...)
-      ▼
-MembershipModule
-      │
-      │ Поиск абонемента
-      │
-      │ Проверка сроков действия
-      │
-      ▼
-ValidationResult
-      │
-      ▼
-VisitModule
-```
+![uml_3](images/uml_3.png)
 
 При успешной проверке `VisitModule` продолжает сохранение визита.
 
@@ -698,21 +627,7 @@ CustomerValidationContract v1
 
 ### 12.12. Пример обмена
 
-```text
-MembershipModule
-      │
-      │ validate_customer(...)
-      ▼
-CustomerModule
-      │
-      │ Проверка БД
-      │
-      ▼
-ValidationResult
-      │
-      ▼
-MembershipModule
-```
+![uml_4](images/uml_4.png)
 
 ---
 
@@ -720,25 +635,7 @@ MembershipModule
 
 После определения протоколов полный процесс выглядит следующим образом:
 
-```text
-Сотрудник (WPF)
-  │
-  │ Отмечает посещение (POST)
-  ▼
-FastAPI Host
-  │
-  ▼
-VisitModule
-  │
-  ├──────────────► MembershipModule
-  │                 Проверка активности
-  │                 абонемента
-  │
-  │ Создание Visit
-  │
-  └──────────────► База данных
-                    Сохранение записи
-```
+![uml_5](images/uml_5.png)
 
 Результатом операции является зафиксированный визит и обновленный интерфейс WPF-клиента.
 
