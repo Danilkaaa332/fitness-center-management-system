@@ -2,33 +2,9 @@
 
 Внутренние зависимости на сервере определяют взаимодействие модулей.
 
-```text
-API Host
- ↓
-VisitModule
- ↓
-Contracts (Interfaces)
-
-API Host
- ↓
-MembershipModule
- ↓
-Contracts (Interfaces)
-```
+![uml_2](../images/uml_2.png)
 
 Взаимодействие между модулями выполняется через публичные сервисные контракты.
-
-Например:
-
-```text
-VisitModule
-      ↓
-IMembershipValidationService
-      ↓
-MembershipModule
-```
-
-Это позволяет уменьшить связанность системы.
 
 ---
 
@@ -47,3 +23,5 @@ MembershipModule
 | Git | Контроль версий |
 
 Конкретные версии библиотек фиксируются в конфигурационных файлах проектов.
+
+---
