@@ -11,69 +11,54 @@ public class MembershipService : IMembershipValidationService
 
     public MembershipService(ILogger<MembershipService> logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
-    public MembershipDto CreateMembership(Guid customerId, string type, DateTime startDate, int durationDays, decimal price, string status = "Active")
+    public MembershipDto CreateMembership(
+        Guid customerId,
+        string type,
+        DateTime startDate,
+        int durationDays,
+        decimal price,
+        string status = MembershipStatuses.Active)
     {
-        var normalizedStart = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
-        var normalizedEnd = normalizedStart.AddDays(durationDays);
+        if (customerId == Guid.Empty)
+            throw new ArgumentException("Идентификатор клиента не может быть пустым.", nameof(customerId));
+        if (string.IsNullOrWhiteSpace(type))
+            throw new ArgumentException("Тип абонемента не может быть пустым.", nameof(type));
+        if (durationDays <= 0)
+            throw new ArgumentOutOfRangeException(nameof(durationDays), "Длительность должна быть больше 0.");
+        if (price < 0)
+            throw new ArgumentOutOfRangeException(nameof(price), "Стоимость не может быть отрицательной.");
+        if (string.IsNullOrWhiteSpace(status))
+            throw new ArgumentException("Статус абонемента не может быть пустым.", nameof(status));
 
         var membership = new MembershipDto(
-            Guid.NewGuid(),
-            customerId,
-            type,
-            normalizedStart,
-            normalizedEnd,
-            price,
-            status
-        );
+            Guid.NewGuid(), customerId, type.Trim(), startDate, startDate.AddDays(durationDays), price, status.Trim());
 
         _memberships[membership.Id] = membership;
-
-        _logger.LogInformation(
-            "Создан абонемент {MembershipId} для клиента {CustomerId}. Срок: {StartDate:yyyy-MM-dd} - {EndDate:yyyy-MM-dd}, Статус: {Status}",
-            membership.Id, customerId, membership.StartDate, membership.EndDate, membership.Status);
-
         return membership;
     }
 
-    public Task<ValidationResult> CheckValidityAsync(MembershipCheckRequest request)
+    public Task<ValidationResult> CheckValidityAsync(
+        MembershipCheckRequest request,
+        CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation(
-            "Проверка абонемента {MembershipId} на дату визита {VisitDate:O}",
-            request.MembershipId, request.VisitDate);
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!_memberships.TryGetValue(request.MembershipId, out var membership))
-        {
-            _logger.LogWarning("Абонемент {MembershipId} не найден", request.MembershipId);
-            return Task.FromResult(new ValidationResult(false, "MEMBERSHIP_NOT_FOUND"));
-        }
+            return Task.FromResult(new ValidationResult(false, FitnessErrorCodes.MembershipNotFound));
 
-        if (string.Equals(membership.Status, "Blocked", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning("Абонемент {MembershipId} заблокирован", request.MembershipId);
-            return Task.FromResult(new ValidationResult(false, "MEMBERSHIP_BLOCKED"));
-        }
+        var normalizedStatus = membership.Status?.Trim() ?? string.Empty;
+        if (!string.Equals(normalizedStatus, MembershipStatuses.Active, StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(new ValidationResult(false, FitnessErrorCodes.MembershipBlocked));
 
-        var visitDayUtc = request.VisitDate.Kind == DateTimeKind.Unspecified
-            ? request.VisitDate.Date
-            : request.VisitDate.ToUniversalTime().Date;
+        if (request.VisitDate.Date < membership.StartDate.Date || request.VisitDate.Date > membership.EndDate.Date)
+            return Task.FromResult(new ValidationResult(false, FitnessErrorCodes.MembershipExpired));
 
-        var startDayUtc = membership.StartDate.Date;
-        var endDayUtc = membership.EndDate.Date;
-
-        Debug.WriteLine($"[Debug MembershipService] VisitDay={visitDayUtc:yyyy-MM-dd}, StartDay={startDayUtc:yyyy-MM-dd}, EndDay={endDayUtc:yyyy-MM-dd}");
-
-        if (visitDayUtc < startDayUtc || visitDayUtc > endDayUtc)
-        {
-            _logger.LogWarning(
-                "Срок действия абонемента {MembershipId} истек (EndDate: {EndDate:yyyy-MM-dd}, VisitDate: {VisitDate:yyyy-MM-dd})",
-                request.MembershipId, endDayUtc, visitDayUtc);
-            return Task.FromResult(new ValidationResult(false, "MEMBERSHIP_EXPIRED"));
-        }
-
-        _logger.LogInformation("Абонемент {MembershipId} успешно прошел проверку", request.MembershipId);
         return Task.FromResult(new ValidationResult(true, null));
     }
+
 }

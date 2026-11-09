@@ -12,59 +12,37 @@ public class VisitService
 
     public VisitService(IMembershipValidationService membershipValidator, ILogger<VisitService> logger)
     {
+        ArgumentNullException.ThrowIfNull(membershipValidator);
+        ArgumentNullException.ThrowIfNull(logger);
         _membershipValidator = membershipValidator;
         _logger = logger;
     }
 
-    public async Task<(bool Success, string? ErrorCode, VisitDto? Visit)> RegisterVisitAsync(RegisterVisitRequest request)
+    public async Task<RegisterVisitResult> RegisterVisitAsync(
+        RegisterVisitRequest request,
+        CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation(
-            "Запрос на регистрацию визита: CustomerId={CustomerId}, MembershipId={MembershipId}, VisitDate={VisitDate:O}",
-            request.CustomerId, request.MembershipId, request.VisitDate);
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        bool alreadyVisitedToday = _visits.Any(v =>
-            v.CustomerId == request.CustomerId &&
-            v.MembershipId == request.MembershipId &&
-            v.VisitDate.Date == request.VisitDate.Date &&
-            v.Status == "Registered");
-
-        if (alreadyVisitedToday)
-        {
-            Debug.WriteLine($"[Debug VisitService] Duplicate visit detected for CustomerId={request.CustomerId} on {request.VisitDate:yyyy-MM-dd}");
-            _logger.LogWarning(
-                "Повторная регистрация визита отклонена: клиент {CustomerId} уже зарегистрирован {VisitDate:yyyy-MM-dd}",
-                request.CustomerId, request.VisitDate);
-            return (false, "DUPLICATE_VISIT_SAME_DAY", null);
-        }
+        if (request.CustomerId == Guid.Empty || request.MembershipId == Guid.Empty)
+            return new RegisterVisitResult(false, FitnessErrorCodes.InvalidRequest, null);
 
         var validation = await _membershipValidator.CheckValidityAsync(
-            new MembershipCheckRequest(request.MembershipId, request.VisitDate));
+            new MembershipCheckRequest(request.MembershipId, request.VisitDate),
+            cancellationToken);
 
         if (!validation.IsValid)
-        {
-            _logger.LogWarning(
-                "Отказ в регистрации визита для клиента {CustomerId} по абонементу {MembershipId}. Код ошибки: {ErrorCode}",
-                request.CustomerId, request.MembershipId, validation.ErrorCode);
+            return new RegisterVisitResult(false, validation.ErrorCode, null);
 
-            return (false, validation.ErrorCode, null);
-        }
+        if (_visits.Any(v => v.CustomerId == request.CustomerId && v.VisitDate.Date == request.VisitDate.Date))
+            return new RegisterVisitResult(false, FitnessErrorCodes.DuplicateVisit, null);
 
-        var visit = new VisitDto(
-            Guid.NewGuid(),
-            request.CustomerId,
-            request.MembershipId,
-            request.VisitDate,
-            "Registered"
-        );
-
+        var visit = new VisitDto(Guid.NewGuid(), request.CustomerId, request.MembershipId, request.VisitDate, VisitStatuses.Registered);
         _visits.Add(visit);
-
-        _logger.LogInformation(
-            "Визит {VisitId} успешно зарегистрирован для клиента {CustomerId}",
-            visit.Id, request.CustomerId);
-
-        return (true, null, visit);
+        return new RegisterVisitResult(true, null, visit);
     }
+
 
     public IReadOnlyList<VisitDto> GetVisits() => _visits.AsReadOnly();
 }
