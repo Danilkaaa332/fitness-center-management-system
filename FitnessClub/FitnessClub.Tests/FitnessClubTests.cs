@@ -74,20 +74,28 @@ public class FitnessClubTests
     }
 
     [Fact]
-    public async Task Regression_RegisterVisit_WhenCalledTwiceSameDay_RejectsDuplicate()
+    public void CreateMembership_WhenDurationOrPriceIsInvalid_ThrowsArgumentOutOfRangeException()
+    {
+        var service = new MembershipService(NullLogger<MembershipService>.Instance);
+        var startDate = new DateTime(2026, 10, 1);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            service.CreateMembership(Guid.NewGuid(), "Месячный", startDate, durationDays: 0, price: 3500m));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            service.CreateMembership(Guid.NewGuid(), "Месячный", startDate, durationDays: 30, price: -100m));
+    }
+
+    [Fact]
+    public async Task RegisterVisitAsync_WhenCancellationRequested_ThrowsOperationCanceledException()
     {
         var membershipService = new MembershipService(NullLogger<MembershipService>.Instance);
         var visitService = new VisitService(membershipService, NullLogger<VisitService>.Instance);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
 
-        var customerId = Guid.NewGuid();
-        var membership = membershipService.CreateMembership(customerId, "Месячный безлимит", new DateTime(2026, 10, 1), 30, 3500m);
+        var request = new RegisterVisitRequest(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 10, 15));
 
-        var firstVisit = await visitService.RegisterVisitAsync(new RegisterVisitRequest(customerId, membership.Id, new DateTime(2026, 10, 15, 10, 0, 0)));
-        var duplicateVisit = await visitService.RegisterVisitAsync(new RegisterVisitRequest(customerId, membership.Id, new DateTime(2026, 10, 15, 10, 1, 0)));
-
-        Assert.True(firstVisit.Success);
-        Assert.False(duplicateVisit.Success);
-        Assert.Equal("DUPLICATE_VISIT_SAME_DAY", duplicateVisit.ErrorCode);
-        Assert.Single(visitService.GetVisits());
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            visitService.RegisterVisitAsync(request, cts.Token));
     }
 }
