@@ -1,5 +1,37 @@
 ﻿namespace FitnessClub.Contracts;
 
+public static class MembershipStatuses
+{
+    public const string Active = "Active";
+    public const string Blocked = "Blocked";
+    public const string Frozen = "Frozen";
+}
+
+public static class VisitStatuses
+{
+    public const string Registered = "Registered";
+    public const string Cancelled = "Cancelled";
+}
+
+public static class FitnessErrorCodes
+{
+    public const string InvalidRequest = "INVALID_REQUEST";
+    public const string MembershipNotFound = "MEMBERSHIP_NOT_FOUND";
+    public const string MembershipBlocked = "MEMBERSHIP_BLOCKED";
+    public const string MembershipExpired = "MEMBERSHIP_EXPIRED";
+    public const string DuplicateVisit = "DUPLICATE_VISIT";
+}
+
+public record RegisterVisitResult(bool Success, string? ErrorCode = null, VisitDto? Visit = null);
+
+public interface IMembershipValidationService
+{
+    Task<ValidationResult> CheckValidityAsync(
+        MembershipCheckRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+
 public record CustomerDto(
     Guid Id,
     string FullName,
@@ -41,7 +73,3 @@ public record VisitDto(
     string Status
 );
 
-public interface IMembershipValidationService
-{
-    Task<ValidationResult> CheckValidityAsync(MembershipCheckRequest request);
-}
